@@ -42,7 +42,7 @@ it never silently falls back to HTTPS or an unauthenticated clone.
 ## Install
 
 ```bash
-git clone git@github.com:<your-username>/ssh-keygen-controller.git
+git clone https://github.com/tanaratsaehia/ssh-keygen-controller.git
 cd ssh-keygen-controller
 ./install.sh
 ```
