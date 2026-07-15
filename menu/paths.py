@@ -7,5 +7,6 @@ AGENT_ENV_PATH = KEYS_DIR / ".agent-env"
 
 CONFIG_DIR = HOME / ".ssh-keygen-controller"
 CONFIG_PATH = CONFIG_DIR / "config.json"
+CD_TARGET_PATH = CONFIG_DIR / ".cd_target"
 
 DEFAULT_CLONE_ROOT = HOME / "repos"

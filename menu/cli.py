@@ -3,7 +3,7 @@ import shutil
 from pathlib import Path
 
 from . import agent, clone as clone_mod, config_store, keygen, login_hook
-from .paths import DEFAULT_CLONE_ROOT
+from .paths import CD_TARGET_PATH, DEFAULT_CLONE_ROOT
 
 
 def _print_pubkey_instructions(repo: str) -> None:
@@ -139,6 +139,44 @@ def cmd_reset() -> int:
     return 0
 
 
+def _cloned_repos() -> dict:
+    return {r: m for r, m in config_store.all_repos().items() if Path(m["clone_path"]).exists()}
+
+
+def cmd_goto(repo: str = None) -> int:
+    """Selects a cloned project's path and hands it off via CD_TARGET_PATH.
+    A plain Python subprocess can't change its parent shell's directory, so
+    the actual `cd` happens in the shell function installed by
+    login_hook.install(), which reads this file after sshctl exits."""
+    cloned = _cloned_repos()
+    if not cloned:
+        print("  No cloned projects found yet.")
+        return 1
+
+    if repo is None:
+        items = list(cloned.items())
+        print()
+        print("  Cloned projects:")
+        for i, (r, meta) in enumerate(items, 1):
+            print(f"   {i}) {r}  ->  {meta['clone_path']}")
+        choice = input("  > ").strip()
+        try:
+            repo, meta = items[int(choice) - 1]
+        except (ValueError, IndexError):
+            print("  Invalid selection.")
+            return 1
+    else:
+        meta = cloned.get(repo)
+        if not meta:
+            print(f"  {repo} is not tracked or not cloned.")
+            return 1
+
+    CD_TARGET_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CD_TARGET_PATH.write_text(meta["clone_path"])
+    print(f"  -> {meta['clone_path']}")
+    return 0
+
+
 def cmd_load_keys(quiet: bool = False) -> int:
     repos = config_store.all_repos()
     keys = [keygen.private_key_path(r) for r in repos if keygen.key_exists(r)]
@@ -156,6 +194,12 @@ def _prompt_repo() -> str:
     return input("  owner/repo: ").strip()
 
 
+def _clear_screen() -> None:
+    # Move cursor home and clear the visible screen (not scrollback) —
+    # standard ANSI, works on any terminal a Raspberry Pi test device uses.
+    print("\033[H\033[2J", end="")
+
+
 def _interactive_menu() -> int:
     actions = {
         "1": ("Add repo", lambda: cmd_add(_prompt_repo())),
@@ -165,8 +209,10 @@ def _interactive_menu() -> int:
         "5": ("Clone / re-clone", lambda: cmd_clone(_prompt_repo())),
         "6": ("Reset device (bulk generate + clone)", cmd_reset),
         "7": ("Load keys into ssh-agent now", cmd_load_keys),
+        "8": ("Go to project (cd)", cmd_goto),
     }
     while True:
+        _clear_screen()
         print("\n  sshctl — SSH deploy key manager")
         for key, (label, _) in actions.items():
             print(f"   {key}) {label}")
@@ -179,6 +225,7 @@ def _interactive_menu() -> int:
         action = actions.get(choice)
         if not action:
             print("  Unknown option.")
+            input("  Press Enter to continue...")
             continue
 
         try:
@@ -187,6 +234,8 @@ def _interactive_menu() -> int:
             print()
         except Exception as e:
             print(f"  Error: {e}")
+
+        input("\n  Press Enter to continue...")
 
 
 def main(argv) -> int:
@@ -217,6 +266,9 @@ def main(argv) -> int:
 
     sub.add_parser("install-hook")
 
+    p = sub.add_parser("goto")
+    p.add_argument("repo", nargs="?")
+
     args = parser.parse_args(argv)
 
     if args.command == "add":
@@ -235,5 +287,7 @@ def main(argv) -> int:
         return cmd_load_keys(args.quiet)
     if args.command == "install-hook":
         return cmd_install_hook()
+    if args.command == "goto":
+        return cmd_goto(args.repo)
 
     return _interactive_menu()

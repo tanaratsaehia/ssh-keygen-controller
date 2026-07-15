@@ -74,6 +74,7 @@ Run `sshctl` with no arguments to reopen the interactive menu at any time:
    5) Clone / re-clone
    6) Reset device (bulk generate + clone)
    7) Load keys into ssh-agent now
+   8) Go to project (cd)
    0) Exit
 ```
 
@@ -87,6 +88,7 @@ sshctl remove owner/repo [--delete-clone]
 sshctl clone owner/repo [--force]
 sshctl reset
 sshctl load-keys [--quiet]
+sshctl goto [owner/repo]
 ```
 
 ### Adding a repo
@@ -127,6 +129,24 @@ sshctl reset
 `reset` walks every tracked repo, generates a fresh device-specific key for
 any repo that doesn't already have one on this device, prompts you to add
 each one on GitHub, and clones anything not already present.
+
+### Jumping to a cloned project
+
+```bash
+sshctl goto
+```
+
+Lists every tracked repo that's actually cloned on this device and lets you
+pick one; running `sshctl goto owner/repo` skips the picker. Your shell
+lands in that repo's directory when the command returns.
+
+This only works from an interactive shell that has the login hook installed
+(see [Provisioning a fresh device](#provisioning-a-fresh-device) / re-run
+`install.sh` on existing devices) — a plain child process can never change
+its parent shell's working directory, so `install-hook` also defines a
+`sshctl` shell function in `~/.bashrc` that does the actual `cd` once the
+underlying command exits. Non-interactive uses (scripts, `sshctl_launcher.sh`
+run directly) just print the resolved path instead.
 
 ## Where things live
 
